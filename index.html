@@ -1,0 +1,508 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>e21 摩奇創意｜龍舟大賽</title>
+    <style>
+        html, body {  margin: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div id="threejsContainer"></div>
+    <script type="text/javascript" src="Scripts/threejs/three.min.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/OBJLoader.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/threex.keyboardstate.js"></script>
+
+    <script type="text/javascript">
+        var container;                              //Three.js 畫布
+        var scene, camera, renderer; 			    //Three.js 所使用必要元素
+        var Clock = new THREE.Clock();              //計時器
+        var LM = new THREE.LoadingManager();        //Loading Manager   
+        var objLoader = new THREE.OBJLoader(LM);    //objLoader
+
+        var Sky;            					    //SkyBox 
+        var Water_Subject;  					    //水面主體
+		var torus_Coll_Inside,torus_Coll_Outside;   //水道內外圈
+
+		var boatList = [];						    //船集合
+		var boatInfo = function (object, targetPosition, theta) {
+		    this.object = object;           //船主體
+		    this.targetP = targetPosition;  //船目標位置(做延遲移動用)
+		    this.theta = theta;             //船角度
+		}
+
+        var moveUnit = 100;                         //移動單位距離
+
+        var Treasure_Array = [];                    //寶物Array
+        var Abstacle_Array = [];                    //障礙物Array
+
+        var Camera_Dis = 50;
+
+		var isFog = true;
+
+		function init() {
+            //=====取得Three.js 畫布容器====================================================================================================
+            container = document.getElementById('threejsContainer');
+
+		    //=====場景、攝影機 和 渲染器 設置==================================================================================
+            //場景
+            scene = new THREE.Scene();
+            if (isFog)  scene.fog = new THREE.FogExp2(0xCCCCCC, 0.0006);
+
+            //攝影機(鏡頭焦距, 螢幕寬高比, 最近顯影距離, 最遠顯影距離)
+            cameraA = new THREE.PerspectiveCamera(60, (window.innerWidth/2) / window.innerHeight, 1, 100000);
+            cameraA.position.set(-1200, 0, 0);
+
+
+		    //攝影機(鏡頭焦距, 螢幕寬高比, 最近顯影距離, 最遠顯影距離)
+            cameraB = new THREE.PerspectiveCamera(60, (window.innerWidth / 2) / window.innerHeight, 1, 100000);
+            cameraB.position.set(0, 1000, 0);
+
+            //渲染器
+            rendererA = window.WebGLRenderingContext ? new THREE.WebGLRenderer() : new THREE.CanvasRenderer();   //判斷流覽器使用支援WebGL，若無使用CanvasRenderer
+            if (isFog) rendererA.setClearColor(0xCCCCCC);
+            rendererA.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1);                      //設置Renderer解析度
+            rendererA.setSize(window.innerWidth/2, window.innerHeight);                                            //設置Renderer顯示尺寸
+            rendererA.shadowMap.enabled = true;
+            rendererA.shadowMap.type = THREE.BasicShadowMap;
+            container.appendChild(rendererA.domElement);
+
+            rendererB = window.WebGLRenderingContext ? new THREE.WebGLRenderer() : new THREE.CanvasRenderer();   //判斷流覽器使用支援WebGL，若無使用CanvasRenderer
+            if (isFog) rendererB.setClearColor(0xCCCCCC);
+            rendererB.setSize(window.innerWidth / 2, window.innerHeight);                                            //設置Renderer顯示尺寸
+            container.appendChild(rendererB.domElement);
+ 
+            //=====光源設計==================================================================================================================
+            //全域光源
+            var ambientLight = new THREE.AmbientLight(0x111111);
+            scene.add(ambientLight);
+
+            //聚光燈
+            /*directLight = new THREE.DirectionalLight(0xFFFFCC, 1);
+            directLight.position.set(500, 500, 500);
+            directLight.castShadow = true;
+            directLight.shadowCameraVisible = true;
+            scene.add(directLight);*/
+
+            var directLight = new THREE.SpotLight(0xFFFFFF);
+            directLight.position.set(0, 1000, 0);
+
+            directLight.castShadow = true;
+
+            directLight.shadowMapWidth = 10000;
+            directLight.shadowMapHeight = 10000;
+
+            directLight.shadowCameraNear = 2;
+            directLight.shadowCameraFar = 2000;
+
+            scene.add(directLight);
+            scene.add(directLight.target);
+
+
+            //=====Sky Box遠景製作===========================================================================================================
+            if (!isFog) {
+                var Sky_ImageUrl = 'images/Textures/Evening/';
+                var Sky_ImageArray = [Sky_ImageUrl + 'px.jpg', Sky_ImageUrl + 'nx.jpg',
+                                     Sky_ImageUrl + 'py.jpg', Sky_ImageUrl + 'ny.jpg',
+                                     Sky_ImageUrl + 'pz.jpg', Sky_ImageUrl + 'nz.jpg'];
+
+                var Sky_TextureCube = new THREE.CubeTextureLoader().load(Sky_ImageArray);
+                var Sky_Shader = THREE.ShaderLib['cube'];
+                Sky_Shader.uniforms['tCube'].value = Sky_TextureCube;
+
+                var Sky_Material = new THREE.ShaderMaterial({
+                    fragmentShader: Sky_Shader.fragmentShader,
+                    vertexShader: Sky_Shader.vertexShader,
+                    uniforms: Sky_Shader.uniforms,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                Sky = new THREE.Mesh(new THREE.BoxGeometry(10000, 10000, 10000), Sky_Material);
+                scene.add(Sky);
+            }
+            
+
+            //=====河道製作==================================================================================================================
+            //賽道邊界
+            var Race_Texture_Map = new THREE.TextureLoader().load('images/Textures/soil.jpg');
+            Race_Texture_Map.wrapS = Race_Texture_Map.wrapT = THREE.RepeatWrapping;
+            Race_Texture_Map.repeat.set(200, 2);
+
+            var  Race_Geometry_Inside = new THREE.TorusGeometry(800, 100, 4, 500);
+            var  Race_Geometry_Outside = new THREE.TorusGeometry(1600, 100, 4, 500);
+            var Race_Material = new THREE.MeshLambertMaterial({
+                map: Race_Texture_Map,
+                wireframe: false,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            var torus_Inside = new THREE.Mesh(Race_Geometry_Inside, Race_Material);
+            scene.add(torus_Inside);
+
+            var torus_Outside = new THREE.Mesh(Race_Geometry_Outside, Race_Material);
+            scene.add(torus_Outside);
+
+            torus_Inside.castShadow = true;
+            torus_Inside.receiveShadow = true;
+            torus_Outside.castShadow = true;
+            torus_Outside.receiveShadow = true;
+
+            torus_Outside.rotation.x = torus_Inside.rotation.x = Math.PI / 2;
+            torus_Outside.position.y = torus_Inside.position.y = -10;
+			
+			//賽道碰撞物建立
+			var torus_Coll_Geometry = new THREE.CircleGeometry(900, 500);
+			torus_Coll_Geometry.vertices.shift();
+			torus_Coll_Inside = new THREE.Line(torus_Coll_Geometry, new THREE.LineBasicMaterial());
+			scene.add(torus_Coll_Inside);
+			
+			torus_Coll_Geometry = new THREE.CircleGeometry(1500, 500);
+			torus_Coll_Geometry.vertices.shift();
+			torus_Coll_Outside = new THREE.Line(torus_Coll_Geometry, new THREE.LineBasicMaterial());
+			scene.add(torus_Coll_Outside);
+			
+			torus_Coll_Inside.rotation.x = torus_Coll_Outside.rotation.x = Math.PI / 2;
+			torus_Coll_Inside.position.y = torus_Coll_Outside.position.y = -1000;
+
+            //水面波動
+            var River_Texture_Map = new THREE.TextureLoader().load('images/Textures/water.jpg');
+            River_Texture_Map.wrapS = River_Texture_Map.wrapT = THREE.RepeatWrapping;
+            River_Texture_Map.repeat.set(5, 5);
+
+            var River_Material = new THREE.MeshPhongMaterial({
+                map: River_Texture_Map,
+                color: 0x99B7FF,
+                specular: 0xFFFFFF,
+                shininess: 5,
+                shading: THREE.FlatShading,
+                transparent: true,
+                opacity: 0.95,
+                side: THREE.DoubleSide
+            });
+
+            River_Geometry = new THREE.PlaneGeometry(20000, 20000, 127, 127);
+            River_Geometry.rotateX(-Math.PI / 2);
+            for (var i = 0, l = River_Geometry.vertices.length; i < l; i++) {
+                River_Geometry.vertices[i].y = 40 * Math.sin(i / 2);
+            }
+
+            River = new THREE.Mesh(River_Geometry, River_Material);
+            River.receiveShadow = true;
+            scene.add(River);
+
+            //=====小船匯入==================================================================================================================
+            var Boat_Texture = new THREE.TextureLoader().load('images/Textures/wood.jpg');
+            objLoader.load('images/Obj/boat.obj', function (object) {
+                boatA = object;
+
+                boatA.traverse(function (child) {
+                    if (child instanceof THREE.Mesh) {
+                        child.material = new THREE.MeshLambertMaterial({
+                            map: Boat_Texture,
+							wireframe: false
+                            /*color: 0xFFFFFF,
+							wireframe: false*/
+                        });
+                    }
+                });
+
+                for (var i = 0; i < boatA.children.length; i++) {
+                    boatA.children[i].geometry.applyMatrix(new THREE.Matrix4().makeTranslation(2.25, 0, -4));
+                }
+
+                boatA.position.set(-1000, 15, 0);
+                boatA.castShadow = true;
+                boatA.receiveShadow = true;
+                scene.add(boatA);
+
+                boatA.scale.set(7, 7, 7);
+
+				
+				
+                animate();
+            }, onProgress, onError);
+			
+			//=====中央大樹匯入==================================================================================================================
+			for(var i=0; i < 50; i++){
+			   makeTrees();
+			}
+			
+			for(var i=0;i < 30; i++){
+				Abstacle_Object();
+			}
+
+            //=====寶石匯入==================================================================================================================
+			for (var i = 0; i < 20; i++) {
+			   Treasure_Object();
+			}
+
+            
+
+            //=====事件偵聽==================================================================================================================
+            window.addEventListener('resize', onWindowResize, false);   //畫面縮放偵測
+        }
+
+
+        function animate() {
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        function render() {
+            var theShortestDis = 999999,
+                boatA_y = 0;
+
+            var delta = Clock.getDelta(),
+				time = Clock.getElapsedTime() * 10;
+
+            //=====河道水面浮動========================================================================================================
+            for (var i = 0; i < River_Geometry.vertices.length; i++) {
+                River_Geometry.vertices[i].y = 10 * Math.sin(i / 5 + (time + i) / 7) - 10 * Math.cos(i / 2 + (time) / 10);
+
+                var potDis = potsDistance3D(River_Geometry.vertices[i], boatA.position);
+
+                //判斷boat目前離哪個點最近，以那個點的高度為船之高度
+                if (theShortestDis > potDis) {
+                    theShortestDis = potDis;
+                    boatA_y = River_Geometry.vertices[i].y;
+                }
+            }
+
+            River.geometry.verticesNeedUpdate = true;
+
+            //=====寶石旋轉========================================================================================================
+            for (var i = 0; i < Treasure_Array.length; i++) {
+                Treasure_Array[i].rotation.y = (time + i) / 20;
+                if (potsDistance3D(Treasure_Array[i].position, boatA.position) < 50) {
+                    var o = scene.getObjectByName(Treasure_Array[i].name);
+                    scene.remove(o);
+                    Treasure_Array.splice(i, 1);
+                    break;
+                }
+            }
+
+
+            //=====鍵盤偵測===========================================================================================================
+            var head_speed = 0;
+            if (keyboard.pressed("left")) {
+                boatA_theta += 2;
+                head_speed++;
+            }
+
+            if (keyboard.pressed("right")) {
+                boatA_theta -= 2;
+                head_speed++;
+            }
+			
+			boatA.rotation.y += ((Math.PI / 180) * boatA_theta - boatA.rotation.y) * 0.05;
+			
+            if (head_speed > 0) {
+				boatA_TargetP.x = boatA.position.x + (Math.sin(boatA.rotation.y)) * moveUnit * head_speed;
+				boatA_TargetP.z = boatA.position.z + (Math.cos(boatA.rotation.y)) * moveUnit * head_speed;
+                
+            }
+
+			//=====船位置設定===================================================================================================
+			boatA.position.x += (boatA_TargetP.x - boatA.position.x) * 0.02;
+            boatA.position.y += (boatA_y + 15 - boatA.position.y) * 0.2;
+            boatA.position.z += (boatA_TargetP.z - boatA.position.z) * 0.02;
+
+			//=====碰撞偵測===================================================================================================
+			var crash = false;
+			for(var i=0; i < torus_Coll_Inside.geometry.vertices.length; i++){
+				if(potsDistance2DforTorus(torus_Coll_Inside.geometry.vertices[i], boatA.position) < 20){
+					crash = true;
+					break;
+				}
+			}
+			
+			if(!crash){
+				for(var i=0; i < torus_Coll_Outside.geometry.vertices.length; i++){
+				    if (potsDistance2DforTorus(torus_Coll_Outside.geometry.vertices[i], boatA.position) < 20) {
+						crash = true;
+						break;
+					}
+				}
+			}
+			if (!crash) {
+			    for (var i = 0; i < Abstacle_Array.length; i++) {
+
+			        if (potsDistance3D(Abstacle_Array[i].position, boatA.position) < Abstacle_Array[i].RoundSize) {
+			            crash = true;
+			            break;
+			        }
+			    }
+			}
+	
+			if(crash){
+				boatA_TargetP.x = boatA.position.x - (Math.sin(boatA.rotation.y)) * moveUnit * 0.1;
+				boatA_TargetP.z = boatA.position.z - (Math.cos(boatA.rotation.y)) * moveUnit * 0.1;
+				boatA.position.x = boatA_TargetP.x;
+				boatA.position.z = boatA_TargetP.z;
+			}
+			
+			
+			
+
+			//=====攝影機位置設定===================================================================================================
+			cameraA.position.set(
+                boatA.position.x - (Camera_Dis * (Math.sin(boatA.rotation.y))),
+                boatA.position.y + 40,
+                boatA.position.z - (Camera_Dis * (Math.cos(boatA.rotation.y)))
+            );
+
+            cameraA.lookAt({
+				'x': boatA.position.x,
+				'y': boatA.position.y + 30,
+				'z': boatA.position.z
+            });
+
+            cameraB.lookAt({
+                'x': boatA.position.x,
+                'y': boatA.position.y + 30,
+                'z': boatA.position.z
+            });
+
+
+                
+            rendererA.render(scene, cameraA); //顯示畫面
+            rendererB.render(scene, cameraB); //顯示畫面
+        }
+
+
+        //Function 視窗縮放偵測====================================================
+        function onWindowResize() {
+            cameraA.aspect = (window.innerWidth/2) / window.innerHeight;
+            cameraA.updateProjectionMatrix();
+            rendererA.setSize((window.innerWidth / 2), window.innerHeight);
+
+            cameraB.aspect = (window.innerWidth / 2) / window.innerHeight;
+            cameraB.updateProjectionMatrix();
+            rendererB.setSize((window.innerWidth / 2), window.innerHeight);
+        }
+
+        
+		
+        //Function 取兩點3D距離========================================================
+        function potsDistance3D(potA, potB) {
+            var disX = potA.x - potB.x,
+                disY = potA.y - potB.y,
+                disZ = potA.z - potB.z;
+            return Math.sqrt(disX * disX + disY * disY + disZ * disZ);
+        }
+		
+        //Function 取兩點2D距離========================================================
+        function potsDistance2D(potA, potB) {
+            var disX = potA.x - potB.x,
+                disY = potA.z - potB.z;
+            return Math.sqrt(disX * disX + disY * disY);
+        }
+
+
+        function potsDistance2DforTorus(potA, potB) {
+            var disX = potA.x - potB.x,
+                disY = potA.y - potB.z;
+            return Math.sqrt(disX * disX + disY * disY);
+        }
+
+        //Function Obj Loading  ====================================================
+        var onProgress = function (xhr) {
+            if (xhr.lengthComputable) {
+                var percentComplete = xhr.loaded / xhr.total * 100;
+                console.log(Math.round(percentComplete, 2) + '% downloaded');
+            }
+        };
+
+        //Function Obj Loading Error  ==============================================
+        var onError = function (xhr) { };
+		
+        //Function 樹木 ==============================================
+        var makeTrees = function () {
+            objLoader.load('images/Obj/tree.obj', function (object) {
+                object.traverse(function (child) {
+                    if (child instanceof THREE.Mesh) {
+                        var treeColor = (Math.random() * 0x77 << 16) | ((Math.random() * 0x77 + 0x55) << 8) | Math.random() * 0x77;
+
+
+                        child.material = new THREE.MeshLambertMaterial({
+                            color: treeColor,
+                            wireframe: false
+                        });
+                    }
+                });
+
+                var distance = RndInt(1, 3) == 1 ? 700 + RndInt(0, 150) : 1700 - RndInt(0, 100);
+                var rndTheta = RndInt(0, 360);
+                object.position.set(Math.sin((Math.PI / 180) * rndTheta) * distance, 50, Math.cos((Math.PI / 180) * rndTheta) * distance);
+                var rndSize = RndInt(50, 100);
+                object.scale.set(rndSize, rndSize, rndSize);
+                object.castShadow = true;
+                object.receiveShadow = true;
+                scene.add(object);
+            }, onProgress, onError);
+        }
+		
+        //====Function 寶物 ==============================================
+        var Treasure_Object = function () {
+            var material = new THREE.MeshPhongMaterial({
+                map: THREE.ImageUtils.loadTexture('images/Textures/gem.jpg'),
+                color: 0x0000FF,
+                specular: 0xFFCCCC,
+                shininess: 10,
+                shading: THREE.FlatShading,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide
+            });
+            
+            var Mesh = new THREE.Mesh(new THREE.OctahedronGeometry(40, RndInt(0, 1)), material);
+
+            var rndTheta = RndInt(0, 360);
+            var distance = RndInt(1000, 1400);
+            Mesh.position.set(Math.sin((Math.PI / 180) * rndTheta) * distance, RndInt(20, 60), Math.cos((Math.PI / 180) * rndTheta) * distance);
+            Mesh.name = 'Treasure' + parseInt(Treasure_Array.length + 1);
+            Mesh.award = '大獎一百萬';
+            scene.add(Mesh);
+            Treasure_Array.push(Mesh);
+        }
+
+        //====Function 爆炸 ==============================================
+        var Boom_Object = function () {
+           
+        }
+
+        //====Function 障礙物 ==============================================
+        var Abstacle_Object = function () {
+            var material = new THREE.MeshPhongMaterial({
+                map: THREE.ImageUtils.loadTexture('images/Textures/soil.jpg'),
+                transparent: true,
+                shading: THREE.FlatShading,
+                side: THREE.DoubleSide
+            });
+
+            var topCircle = RndInt(0, 20),
+                bottomCircle = RndInt(120, 200);
+
+
+            var Mesh = new THREE.Mesh(new THREE.CylinderGeometry(topCircle, bottomCircle, RndInt(150, 400), RndInt(3, 10)), material);
+
+            var rndTheta = RndInt(0, 360);
+            var distance = RndInt(1000, 1400);
+            Mesh.position.set(Math.sin((Math.PI / 180) * rndTheta) * distance, 0, Math.cos((Math.PI / 180) * rndTheta) * distance);
+            Mesh.name = 'Treasure' + parseInt(Treasure_Array.length + 1);
+            Mesh.RoundSize = (topCircle + bottomCircle) / 2 + 10;
+            Mesh.castShadow = true;
+            Mesh.receiveShadow = true;
+            scene.add(Mesh);
+            Abstacle_Array.push(Mesh);
+
+        }
+
+
+        init();
+
+        
+    </script>
+</body>
+</html>

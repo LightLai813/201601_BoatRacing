@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>e21 摩奇創意｜龍舟大賽</title>
+    <style>
+        html, body {  margin: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div id="threejsContainer"></div>
+    <script type="text/javascript" src="Scripts/threejs/three.min.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/OBJLoader.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/threex.keyboardstate.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/water-material.js"></script>
+    <script type="text/javascript" src="Scripts/threejs/Stats.js"></script>
+
+    <script type="text/javascript" src="Scripts/threejs/FirstPersonControls.js"></script>
+
+    <script type="text/javascript">
+        var container;                              //Three.js 畫布
+        var scene, camera,camera2, renderer, stats; //Three.js 所使用必要元素
+        var Clock = new THREE.Clock();              //計時器
+
+        var Sky;            //SkyBox 
+        var Water_Subject;  //水面主體
+
+        var controls;
+        
+
+        function init() {
+            //=====取得Three.js 畫布容器====================================================================================================
+            container = document.getElementById('threejsContainer');
+
+            //=====場景、攝影機、渲染器 和 狀態監測器 設置==================================================================================
+            //場景
+            scene = new THREE.Scene();
+
+            //攝影機(鏡頭焦距, 螢幕寬高比, 最近顯影距離, 最遠顯影距離)
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
+camera2 =  new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100000);
+camera2.position.set(500,500,500);
+            //渲染器
+            renderer = window.WebGLRenderingContext ? new THREE.WebGLRenderer() : new THREE.CanvasRenderer();   //判斷流覽器使用支援WebGL，若無使用CanvasRenderer
+            renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1);                      //設置Renderer解析度
+            renderer.setSize(window.innerWidth, window.innerHeight);                                            //設置Renderer顯示尺寸
+            container.appendChild(renderer.domElement);                                                        
+
+            //狀態監測器
+            stats = new Stats();                          
+            stats.domElement.style.position = 'absolute';
+            stats.domElement.style.top = '0px';
+            container.appendChild(stats.domElement);
+
+
+            //=====光源設計==================================================================================================================
+            //全域光源
+            var ambientLight = new THREE.AmbientLight(0x555555);
+            scene.add(ambientLight);
+
+            //聚光燈
+            var directLight = new THREE.DirectionalLight(0xffff55, 1);
+            directLight.position.set(-600, 300, 600);
+            scene.add(directLight);
+
+
+            //=====Sky Box遠景製作===========================================================================================================
+            var Sky_ImageUrl = 'images/Textures/Rock/';
+            var Sky_ImageArray = [Sky_ImageUrl + 'px.jpg', Sky_ImageUrl + 'nx.jpg',
+							     Sky_ImageUrl + 'py.jpg', Sky_ImageUrl + 'ny.jpg',
+							     Sky_ImageUrl + 'pz.jpg', Sky_ImageUrl + 'nz.jpg'];
+
+            var Sky_TextureCube = new THREE.CubeTextureLoader().load(Sky_ImageArray);
+            var Sky_Shader = THREE.ShaderLib['cube'];
+            Sky_Shader.uniforms['tCube'].value = Sky_TextureCube;
+
+            var Sky_Material = new THREE.ShaderMaterial({
+                fragmentShader: Sky_Shader.fragmentShader,
+                vertexShader: Sky_Shader.vertexShader,
+                uniforms: Sky_Shader.uniforms,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            Sky = new THREE.Mesh(new THREE.BoxGeometry(10000, 10000, 10000), Sky_Material);
+            scene.add(Sky);
+
+            //=====河道製作==================================================================================================================
+            //水面反射
+            var Water_Texture = new THREE.ImageUtils.loadTexture('images/Textures/waternormals.jpg');
+            Water_Texture.wrapS = Water_Texture.wrapT = THREE.RepeatWrapping;
+
+            Water_Subject = new THREE.Water(renderer, camera2, scene, {
+                textureWidth: 256,
+                textureHeight: 256,
+                waterNormals: Water_Texture,
+                alpha: 0.8,
+                sunDirection: directLight.position.normalize(),
+                sunColor: 0xffffff,
+                waterColor: 0x001e0f,
+                betaVersion: 0,
+                side: THREE.DoubleSide
+            });
+
+            var Water_Mirror = new THREE.Mesh(
+			    new THREE.PlaneBufferGeometry(5000, 5000, 10, 10),
+			    Water_Subject.material
+		    );
+            Water_Mirror.add(Water_Subject);
+            Water_Mirror.rotation.x = Math.PI/2;
+
+            scene.add(Water_Mirror);
+
+
+            //================================================================================================================
+            controls = new THREE.FirstPersonControls(camera);
+            controls.movementSpeed = 500;
+            controls.lookSpeed = 0.1;
+            //================================================================================================================
+
+
+    
+            //=====事件偵聽==================================================================================================================
+            window.addEventListener('resize', onWindowResize, false);   //畫面縮放偵測
+
+            animate();
+        }
+
+
+        function animate() {
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        function render() {
+            //=====河道水面浮動===========================================================================================================
+            Water_Subject.material.uniforms.time.value += 1.0 / 60.0;
+            Water_Subject.render();
+
+
+            //================================================================================================================
+            var delta = Clock.getDelta();
+            controls.update(delta);
+            Sky.position.x = camera.position.x;
+            Sky.position.y = camera.position.y;
+            Sky.position.z = camera.position.z;
+            //================================================================================================================
+
+            stats.update();                 //更新狀態
+            renderer.render(scene, camera); //顯示畫面
+        }
+
+
+        //Function 視窗縮放偵測====================================================
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        //Function 亂數Float====================================================
+        function RndFloat(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+        //Function 亂數Int====================================================
+        function RndInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1) + min);
+        }
+
+        init();
+
+        
+    </script>
+</body>
+</html>
