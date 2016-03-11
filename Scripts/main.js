@@ -3,11 +3,14 @@ var gameCore;
 
 var playerList = []; //玩家集合
 var roleBox = [1, 2, 3, 4]; //角色箱(1+2一組, 3+4一組)
+var isShake = [false, false, false, false];
 var Player = function (clientID, roleID, playerName) {
     this.clientID = clientID;
     this.roleID = roleID;
     this.name = playerName;
 }
+
+var step = 'waiting';
 
 var stageHandler = new stageHandler();
 
@@ -26,6 +29,14 @@ var init = function () {
     $('#StartBtn').bind('click', function () {
         startGame();
     });
+
+    for (var i = 0; i < 3; i++) {
+        var playerRoleID = roleBox[0];                                              //給予Player ID
+        playerList.push(new Player('45635211555', playerRoleID, '玩家' + parseInt(i+1)));//新增Player資料到playerList
+        roleBox.splice(0, 1);                                                       //將角色從箱子中拿走
+
+        addReadyPlayer(); //新增畫面等待player
+    }
 }
 
 var setHubClientGetter = function () {
@@ -41,6 +52,14 @@ var setHubClientGetter = function () {
             roleBox.splice(0, 1);                                                       //將角色從箱子中拿走
 
             addReadyPlayer(); //新增畫面等待player
+        }
+    }
+
+    //更新各Player搖動次數
+    gameCore.client.updateShakeTimes = function (returnRoomID, returnClientID, playerRoleID, leftDistance) {
+        if (returnRoomID == roomID) {
+            console.log('shake' + playerRoleID);
+            isShake[playerRoleID-1] = true;
         }
     }
 }
@@ -59,8 +78,9 @@ function addReadyPlayer() {
 var startGame = function () {
     if (playerList.length < 4) {
         alert('玩家尚未全部進入，請稍等片刻');
-    } else {
+    } else if(step == 'waiting'){
         intoGame();
+        step = 'gaming'
     }
 }
 
@@ -68,11 +88,8 @@ var intoGame = function () {
     stageHandler.intoGame();
 
     $('#introView').fadeOut(500);
+    gameCore.server.tellPlayerGameStart(roomID, 0);
 }
 
-var startGame = function () {
-    gameCore.server.tellPlayerGameStart(roomID, 0);
-    
-}
 
 init();

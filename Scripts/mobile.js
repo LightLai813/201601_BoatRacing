@@ -40,31 +40,10 @@ $(document).ready(function () {
 
     //接收Server端遊戲開始通知
     gameCore.client.gameStart = function (retureRoomID, countDown) {
+        
+
         if (retureRoomID == roomID) {
-            if (gameProgress == "waitingothers") {
-                countdown();
-            } else if (gameProgress == "countdown") {
-                switch (countDown) {
-                    case 3:
-                        $(".countdown").hide();
-                        $("#count2").show();
-                        break;
-
-                    case 2:
-                        $(".countdown").hide();
-                        $("#count1").show();
-                        break;
-
-                    case 1:
-                        $(".countdown").hide();
-                        $("#count0").show();
-                        break;
-
-                    case 0:
-                        startGame();
-                        break;
-                }
-            }
+            startGame();
         }
     }
 
@@ -94,6 +73,7 @@ function sendName(eventData) {
         if (speed > SHAKE_THRESHOLD) {
             //超過閥值時,送出姓名
             $.connection.hub.start().done(function () {
+
                 clientID = $.connection.hub.id;
                 gameCore.server.playerConnected(roomID, clientID, playerName, mainID);
             });
@@ -158,9 +138,7 @@ function playerShake(eventData) {
 
         var speed = Math.abs(x + y + z - pre_x - pre_y - pre_z) / diffTime * 10000;
 
-        if (speed > SHAKE_THRESHOLD && shakeTimes < 100) {
-            shakeTimes += 2;
-            $(".go_font .distance .number .num").html(100 - shakeTimes);
+        if (speed > SHAKE_THRESHOLD) {
 
             var footChoose = "";
             if (leftfoot) {
@@ -171,11 +149,10 @@ function playerShake(eventData) {
                 footChoose = "_2"
             }
 
-            if (shakeTimes % 4 == 0) {
-                $.connection.hub.start().done(function () {
-                    gameCore.server.playerShaking(roomID, clientID, 100 - shakeTimes, playerRoleID, mainID);
-                });
-            }
+            $.connection.hub.start().done(function () {
+                gameCore.server.playerShaking(roomID, clientID, 100, playerRoleID, mainID);
+            });
+
         }
 
         pre_x = x;

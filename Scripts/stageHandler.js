@@ -20,8 +20,8 @@ stageHandler.prototype = {
     River:          new THREE.Mesh,
     River_Geometry: new THREE.PlaneGeometry(20000, 20000, 127, 127),
 
-    moveUnit:       100,                                        //移動單位距離
-    Camera_Dis:     60,                                        //攝影機與船距離
+    Camera_Dis:     300,                                         //攝影機與船距離
+    boatMoveUnit:   150,                                        //船移動單位距離
     isFog:          true,
 
     step:           'waiting',
@@ -33,7 +33,7 @@ stageHandler.prototype = {
 
         self.container = document.getElementById('threejsStage');   //取得Three.js 畫布容器
         if (self.isFog) self.scene.fog = new THREE.FogExp2(0xCCCCCC, 0.0003);   //場景前面已經宣告好,這邊判定是否要加入迷霧效果
-        self.insertCamera(0, 600, 0);    //載入第一台攝影機
+        self.insertCamera(0, 1000, 0);    //載入第一台攝影機
         self.insertRenderer();  //載入第一台渲染器
 
         //=====光源設計==================================================================================================================
@@ -41,14 +41,24 @@ stageHandler.prototype = {
         var ambientLight = new THREE.AmbientLight(0x333333);
         self.scene.add(ambientLight);
 
-        var directLight = new THREE.DirectionalLight(0xFFFFFF, 1);
+        /*var directLight = new THREE.DirectionalLight(0xFFFFFF, 1);
         directLight.position.set(1000, 500, -1000);
         directLight.castShadow = true;
-        self.scene.add(directLight);
+        directLight.shadowDarkness = 0.5;
+        self.scene.add(directLight);*/
 
+        var spotLight = new THREE.SpotLight(0xFFAA88);
+        spotLight.position.set(1000, 500, -1000);
+        spotLight.target.position.set(1000, 2, 0);
+        spotLight.shadowCameraNear = 0.01;
+        spotLight.castShadow = true;
+        spotLight.shadowDarkness = 0.5;
+        spotLight.shadowCameraVisible = true;
+        self.scene.add(spotLight);
 
         //=====物件加入==================================================================================================================
         self.setTorus();
+        self.setGround();
         if (!self.isFog) self.insertSkyBox();
         self.setRiverPlane();
        
@@ -79,13 +89,11 @@ stageHandler.prototype = {
                 var potDis = self.potsDistance3D(self.River_Geometry.vertices[i], self.boatList[j].object.position);
                 if (theShortestDis > potDis) {
                     theShortestDis = potDis;
-                    self.boatList[j].object.position.y = self.River_Geometry.vertices[i].y + 30;
+                    self.boatList[j].object.position.y = self.River_Geometry.vertices[i].y + 8;
 
                 }
             }
         }
-
-        
 
         switch (self.step) {
             case 'waiting':
@@ -93,10 +101,10 @@ stageHandler.prototype = {
                 if (self.changeCount <= 0 && parseInt(time) % 50 == 0) {
                     self.camera[0].position.set(
                         RndInt(-1600, 1600),
-                        RndInt(50, 1000),
+                        RndInt(200, 1000),
                         RndInt(-1600, 1600)
                     );
-                    self.changeCount = 60;
+                    self.changeCount = 120;
                 }
 
                 for (var i = 0; i < self.renderer.length; i++) {
@@ -132,7 +140,7 @@ stageHandler.prototype = {
 
             case 'count':
                 self.finalCount--;
-
+                self.Camera_Dis--;
                 for (var i = 0; i < self.renderer.length; i++) {
                     if (self.boatList[i] != undefined) {
                         self.camera[i].lookAt(self.boatList[i].object.position);
@@ -146,22 +154,28 @@ stageHandler.prototype = {
                                 boat.position.y + 40,
                                 boat.position.z - (self.Camera_Dis * (Math.cos(boat.rotation.y)))
                             );
+
+                            self.camera[i].lookAt({
+                                'x': boat.position.x,
+                                'y': boat.position.y + 30,
+                                'z': boat.position.z
+                            });
                         } else if (self.finalCount <= 120) {
                             self.camera[i].position.set(
                                 boat.position.x - (self.Camera_Dis * (Math.cos(boat.rotation.y))),
-                                boat.position.y + 80,
+                                boat.position.y + 200,
                                 boat.position.z - (self.Camera_Dis * (Math.sin(boat.rotation.y)))
                             );
                         } else if (self.finalCount <= 180) {
                             self.camera[i].position.set(
-                                boat.position.x - (self.Camera_Dis * (Math.cos(boat.rotation.y))),
-                                boat.position.y + 120,
-                                boat.position.z - (self.Camera_Dis * (-Math.sin(boat.rotation.y)))
+                                boat.position.x - (self.Camera_Dis * (-Math.cos(boat.rotation.y))),
+                                boat.position.y + 200,
+                                boat.position.z - (self.Camera_Dis * (Math.sin(boat.rotation.y)))
                             );
                         } else if (self.finalCount <= 240) {
                             self.camera[i].position.set(
                                 boat.position.x - (self.Camera_Dis * (-Math.sin(boat.rotation.y))),
-                                boat.position.y + 200,
+                                boat.position.y + 500,
                                 boat.position.z - (self.Camera_Dis * (Math.cos(boat.rotation.y)))
                             );
                         }
@@ -171,16 +185,71 @@ stageHandler.prototype = {
                 break;
 
             case 'gaming':
+                var head_speed = [0,0];
+
+                for (var i = 0; i < isShake.length; i++) {
+                    if (isShake[i]) {
+                        
+                        if (i % 2 == 0) {
+                            self.boatList[Math.floor(i / 2)].theta += 2;
+                            head_speed[Math.floor(i / 2)]++;
+                        } else {
+                            self.boatList[Math.floor(i / 2)].theta -= 2;
+                            head_speed[Math.floor(i / 2)]++;
+                        }
+
+                        isShake[i] = false;
+                    }
+                }
+
                 for (var i = 0; i < self.renderer.length; i++) {
                     var boat = self.boatList[i].object;
 
+                    boat.rotation.y += ((Math.PI / 180) * self.boatList[i].theta - boat.rotation.y) * 0.05;
+
+                    if (head_speed[i] > 0) {
+                        self.boatList[i].targetP.x = boat.position.x + (Math.sin(boat.rotation.y)) * self.boatMoveUnit * head_speed[i];
+                        self.boatList[i].targetP.z = boat.position.z + (Math.cos(boat.rotation.y)) * self.boatMoveUnit * head_speed[i];
+
+                    }
+
+                    //=====船位置設定===================================================================================================
+                    boat.position.x += (self.boatList[i].targetP.x - boat.position.x) * 0.02;
+                    boat.position.z += (self.boatList[i].targetP.z - boat.position.z) * 0.02;
+
+                    //=====碰撞偵測=====================================================================================================
+                    var crash = false;
+
+                    TorusCrashListener:
+                        for (var j = 0; j < self.Torus_Array.length; j++) {
+                            var Torus = self.Torus_Array[j];
+                            for (var k = 0; k < Torus.geometry.vertices.length; k++) {
+                                if (self.potsDistance2DforTorus(Torus.geometry.vertices[k], boat.position) < 20) {
+                                    crash = true;
+                                    break TorusCrashListener;
+                                }
+                            }
+                        }
+
+
+
+                    if (crash) {
+                        self.boatList[i].targetP.x = boat.position.x - (Math.sin(boat.rotation.y)) * self.boatMoveUnit * 0.1;
+                        self.boatList[i].targetP.z = boat.position.z - (Math.cos(boat.rotation.y)) * self.boatMoveUnit * 0.1;
+                        boat.position.x = self.boatList[i].targetP.x;
+                        boat.position.z = self.boatList[i].targetP.z;
+                    }
+                    
+
+
+                    //攝影機位置設定
                     self.camera[i].position.set(
                         boat.position.x - (self.Camera_Dis * (Math.sin(boat.rotation.y))),
                         boat.position.y + 40,
                         boat.position.z - (self.Camera_Dis * (Math.cos(boat.rotation.y)))
                     );
 
-
+                    //攝影機焦點位置設定
                     self.camera[i].lookAt({
                         'x': boat.position.x,
                         'y': boat.position.y + 30,
@@ -217,7 +286,7 @@ stageHandler.prototype = {
         renderer_object.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1);                           //設置Renderer解析度
         renderer_object.setSize(window.innerWidth, window.innerHeight);                                             //設置Renderer顯示尺寸
         renderer_object.shadowMap.enabled = true;
-        renderer_object.shadowMap.type = THREE.BasicShadowMap;
+        renderer_object.shadowMapType = THREE.BasicShadowMap;
         this.container.appendChild(renderer_object.domElement);
         this.renderer.push(renderer_object);
     },
@@ -244,7 +313,6 @@ stageHandler.prototype = {
 
             object.position.set(x, 0, y);
             object.castShadow = true;
-            object.receiveShadow = true;
             object.scale.set(7, 7, 7);
             self.scene.add(object);
             self.boatList.push(new self.boatInfo(object, { 'x': x, 'z': y }, 0));
@@ -257,28 +325,25 @@ stageHandler.prototype = {
     },
     createTree: function () {
         var self = this;
-        var Race_Texture_BumpMap = new THREE.TextureLoader().load('images/Textures/soil_dump.jpg');
 
         self.objLoader.load('images/Obj/tree.obj', function (object) {
             object.traverse(function (child) {
                 if (child instanceof THREE.Mesh) {
                     var treeColor = (Math.random() * 0x77 << 16) | ((Math.random() * 0x77 + 0x55) << 8) | Math.random() * 0x77;
 
-                    child.material = new THREE.MeshLambertMaterial({
-                        bumpMap: Race_Texture_BumpMap,
+                    child.material = new THREE.MeshPhongMaterial({
                         color: treeColor,
                         wireframe: false
                     });
                 }
             });
 
-            var distance = RndInt(1, 3) == 1 ? 700 + RndInt(0, 150) : 1700 - RndInt(0, 100);
+            var distance = RndInt(1, 4) == 1 ? 700 + RndInt(0, 150) : 1600 + RndInt(0, 600);
             var rndTheta = RndInt(0, 360);
             object.position.set(Math.sin((Math.PI / 180) * rndTheta) * distance, 50, Math.cos((Math.PI / 180) * rndTheta) * distance);
             var rndSize = RndInt(50, 100);
             object.scale.set(rndSize, rndSize, rndSize);
             object.castShadow = true;
-            object.receiveShadow = true;
             self.scene.add(object);
         }, self.onProgress, self.onError);
     },
@@ -327,6 +392,36 @@ stageHandler.prototype = {
         this.River.receiveShadow = true;
         this.scene.add(this.River);
     },
+    setGround: function () {
+        var self = this;
+
+        var Ground_Texture = new THREE.TextureLoader().load('images/Textures/soil.jpg');
+        Ground_Texture.wrapS = Ground_Texture.wrapT = THREE.RepeatWrapping;
+        Ground_Texture.repeat.set(50, 50);
+
+        var Ground_Texture_BumpMap = new THREE.TextureLoader().load('images/Textures/soil_dump.jpg');
+        Ground_Texture_BumpMap.wrapS = Ground_Texture_BumpMap.wrapT = THREE.RepeatWrapping;
+        Ground_Texture_BumpMap.repeat.set(50, 50);
+
+        self.objLoader.load('images/Obj/ground.obj', function (object) {
+            object.traverse(function (child) {
+                if (child instanceof THREE.Mesh) {
+                    child.material = new THREE.MeshPhongMaterial({
+                        map: Ground_Texture,
+                        bumpMap: Ground_Texture_BumpMap,
+                        side: THREE.DoubleSide,
+                        specular: '#000000',
+                        wireframe: false
+                    });
+                }
+            });
+
+            object.receiveShadow = true;
+            self.scene.add(object);
+        }, self.onProgress, self.onError);
+
+
+    },
     setTorus: function () {
         var Race_Texture_Map = new THREE.TextureLoader().load('images/Textures/soil.jpg');
         Race_Texture_Map.wrapS = Race_Texture_Map.wrapT = THREE.RepeatWrapping;
@@ -336,11 +431,12 @@ stageHandler.prototype = {
         Race_Texture_BumpMap.wrapS = Race_Texture_BumpMap.wrapT = THREE.RepeatWrapping;
         Race_Texture_BumpMap.repeat.set(10, 1);
 
-        var Race_Geometry_Inside = new THREE.TorusGeometry(800, 100, 4, 500);
-        var Race_Geometry_Outside = new THREE.TorusGeometry(1600, 100, 4, 500);
-        var Race_Material = new THREE.MeshLambertMaterial({
+        var Race_Geometry_Inside = new THREE.TorusGeometry(700, 200, 6, 500);
+        var Race_Geometry_Outside = new THREE.TorusGeometry(1650, 200, 6, 500);
+        var Race_Material = new THREE.MeshPhongMaterial({
             map: Race_Texture_Map,
             bumpMap: Race_Texture_BumpMap,
+            specular: '#000000',
             wireframe: false,
             transparent: true,
             side: THREE.DoubleSide
@@ -384,6 +480,11 @@ stageHandler.prototype = {
     potsDistance2D: function (potA, potB) {//取兩點2D(x,z)距離
         var disX = potA.x - potB.x,
             disY = potA.z - potB.z;
+        return Math.sqrt(disX * disX + disY * disY);
+    },
+    potsDistance2DforTorus: function (potA, potB) {
+        var disX = potA.x - potB.x,
+            disY = potA.y - potB.z;
         return Math.sqrt(disX * disX + disY * disY);
     },
     onProgress: function (xhr) {

@@ -25,22 +25,30 @@
             <div id="teamA" class="readyPlayer">
                 <p class="teamName">Team A</p>
                 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"  width="300px" height="500px" xml:space="preserve">
-                    <path id="Player_1" d="M145 50  A 40 50 1 0 0 145 400 z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
-                    <text id="Player_1_Name" x="135" y="230" text-anchor="end" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
+                    <path id="Player_1" d="M147.744,475.51l-70.721-10.022
+c0,0-40.914-87.197-38.357-169.383c2.557-82.187,16.622-142.322,56.257-203.46c39.635-61.138,44.75-68.154,44.75-68.154h8.07
+V475.51z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
+                    <text id="Player_1_Name" x="135" y="260" text-anchor="end" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
 
-                    <path id="Player_2" d="M155 50  A 40 50 0 0 1 155 400 z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
-                    <text id="Player_2_Name" x="165" y="230" text-anchor="start" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
+                    <path id="Player_2" d="M152.257,475.51l70.72-10.022
+c0,0,40.915-87.197,38.357-169.383c-2.558-82.187-16.622-142.322-56.258-203.46c-39.635-61.138-44.75-68.154-44.75-68.154h-8.069
+V475.51z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
+                    <text id="Player_2_Name" x="165" y="260" text-anchor="start" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
                 </svg>
             </div>
 
             <div id="teamB" class="readyPlayer">
                 <p class="teamName">Team B</p>
                 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"  width="300px" height="500px" xml:space="preserve">
-                    <path id="Player_3" d="M145 50  A 40 50 1 0 0 145 400 z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
-                    <text id="Player_3_Name" x="135" y="230" text-anchor="end" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
+                    <path id="Player_3" d="M147.744,475.51l-70.721-10.022
+c0,0-40.914-87.197-38.357-169.383c2.557-82.187,16.622-142.322,56.257-203.46c39.635-61.138,44.75-68.154,44.75-68.154h8.07
+V475.51z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
+                    <text id="Player_3_Name" x="135" y="260" text-anchor="end" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
 
-                    <path id="Player_4" d="M155 50  A 40 50 0 0 1 155 400 z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
-                    <text id="Player_4_Name" x="165" y="230" text-anchor="start" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
+                    <path id="Player_4" d="M152.257,475.51l70.72-10.022
+c0,0,40.915-87.197,38.357-169.383c-2.558-82.187-16.622-142.322-56.258-203.46c-39.635-61.138-44.75-68.154-44.75-68.154h-8.069
+V475.51z" stroke="#FFF" fill="#000" stroke-width="1" fill-opacity="0.5"/>
+                    <text id="Player_4_Name" x="165" y="260" text-anchor="start" fill="#FFF" style="font-size: 14pt;">等待玩家</text>
                 </svg>
 
             </div>
